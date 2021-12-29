@@ -4,7 +4,7 @@ use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response,
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
-use crate::msg::{CountResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
+use crate::msg::{CountResponse, OwnerResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{State, STATE};
 
 // version info for migration info
@@ -67,12 +67,18 @@ pub fn try_reset(deps: DepsMut, info: MessageInfo, count: i32) -> Result<Respons
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetCount {} => to_binary(&query_count(deps)?),
+        QueryMsg::GetOwner {} => to_binary(&query_owner(deps)?)
     }
 }
 
 fn query_count(deps: Deps) -> StdResult<CountResponse> {
     let state = STATE.load(deps.storage)?;
     Ok(CountResponse { count: state.count })
+}
+
+fn query_owner(deps: Deps) -> StdResult<OwnerResponse> {
+    let state = STATE.load(deps.storage)?;
+    Ok(OwnerResponse { owner: state.owner })
 }
 
 #[cfg(test)]
@@ -335,37 +341,6 @@ mod tests {
     }
 
     #[test]
-    fn reset_by_anyone_then_creator() {
-        let mut deps = mock_dependencies(&coins(2, "token"));
-
-        let msg = InstantiateMsg { count: 17 };
-        let info = mock_info("creator", &coins(2, "token"));
-        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-
-        // beneficiary can release it
-        let unauth_info = mock_info("anyone", &coins(2, "token"));
-        let msg = ExecuteMsg::Reset { count: 5 };
-        let res = execute(deps.as_mut(), mock_env(), unauth_info, msg);
-        match res {
-            Err(ContractError::Unauthorized {}) => {}
-            _ => panic!("Must return unauthorized error"),
-        }
-
-        // only the original creator can reset the counter
-        let auth_info = mock_info("creator", &coins(2, "token"));
-        let msg = ExecuteMsg::Reset { count: 5 };
-        let _res = execute(deps.as_mut(), mock_env(), auth_info, msg).unwrap();
-
-        // should now be 5
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(5, value.count);
-    }
-
-    
-
-
-    #[test]
     fn reset_twice() {
         let mut deps = mock_dependencies(&coins(2, "token"));
 
@@ -556,5 +531,110 @@ mod tests {
         assert_eq!(10, value.count);
     }
 
+
+    // ===========================
+    // VERBOSE REQUIREMENT TESTS
+    // ===========================
+    // - you should be able to instantiate the contract and set the owner 
+    #[test]
+    fn instantiate_the_contract_and_set_the_owner() {
+        let mut deps = mock_dependencies(&[]);
+
+        let msg = InstantiateMsg { count: 0 };
+        let info = mock_info("owner", &coins(1000, "earth"));
+
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // it worked, let's query the state
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+        let value: CountResponse = from_binary(&res).unwrap();
+        assert_eq!(0, value.count);
+    }
+
+    // - you should support a read query to get the owner of the smart contract 
+    #[test]
+    fn support_a_read_query_to_get_the_owner_of_the_start_contract() {
+        let mut deps = mock_dependencies(&[]);
+
+        let msg = InstantiateMsg { count: 0 };
+        let info = mock_info("owner", &coins(1000, "earth"));
+
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // it worked, let's query the state
+        //assert_eq!("owner", res.attributes[1].key);
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetOwner {}).unwrap();
+        let value: OwnerResponse = from_binary(&res).unwrap();
+        assert_eq!("owner", value.owner);
+    }
+
+    // - you should store the score for different addresses in the smart contract state (ex. {address_1: 10, address_2: 20})
+    #[test]
+    fn store_the_score_for_different_addresses_in_the_smart_contract_state() {
+        let mut deps = mock_dependencies(&[]);
+
+        let msg = InstantiateMsg { count: 0 };
+        let info = mock_info("creator", &coins(1000, "earth"));
+
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // it worked, let's query the state
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+        let value: CountResponse = from_binary(&res).unwrap();
+        assert_eq!(0, value.count);
+
+        // Instantiating the second time
+        let msg = InstantiateMsg { count: 50 };
+        let info = mock_info("creator", &coins(1000, "earth"));
+
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // it worked, let's query the state
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+        let value: CountResponse = from_binary(&res).unwrap();
+        assert_eq!(50, value.count);
+    }
+
+    // - you should support an execute message where only the owner of the smart contract can set the score of an address 
+    #[test]
+    fn execute_message_where_only_the_contract_owner_can_set_the_score_of_an_address() {
+        let mut deps = mock_dependencies(&coins(2, "token"));
+
+        let msg = InstantiateMsg { count: 17 };
+        let info = mock_info("creator", &coins(2, "token"));
+        let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+        // beneficiary can release it
+        let unauth_info = mock_info("anyone", &coins(2, "token"));
+        let msg = ExecuteMsg::Reset { count: 5 };
+        let res = execute(deps.as_mut(), mock_env(), unauth_info, msg);
+        match res {
+            Err(ContractError::Unauthorized {}) => {}
+            _ => panic!("Must return unauthorized error"),
+        }
+
+        // only the original creator can reset the counter
+        let auth_info = mock_info("creator", &coins(2, "token"));
+        let msg = ExecuteMsg::Reset { count: 5 };
+        let _res = execute(deps.as_mut(), mock_env(), auth_info, msg).unwrap();
+
+        // should now be 5
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+        let value: CountResponse = from_binary(&res).unwrap();
+        assert_eq!(5, value.count);
+    }
+
+    // - you should support a read query to get the score for a particular address
+
+
+    // - break down an address's score by token type
 
 }
