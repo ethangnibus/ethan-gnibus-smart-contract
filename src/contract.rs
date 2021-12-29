@@ -531,6 +531,123 @@ mod tests {
         assert_eq!(10, value.count);
     }
 
+    #[test]
+    fn editing_multiple_addresses_test() {
+        let mut deps1 = mock_dependencies(&coins(1, "earth"));
+        let mut deps2 = mock_dependencies(&coins(2, "earth"));
+
+        // // Instantiating address_1 with a score of 10
+        let msg1 = InstantiateMsg { count: 10 };
+        let info1 = mock_info("creator", &coins(1, "earth"));
+
+        // we can just call .unwrap() to assert this was a success
+        let res1 = instantiate(deps1.as_mut(), mock_env(), info1, msg1).unwrap();
+        assert_eq!(0, res1.messages.len());
+
+        // Instantiating address_2 with a score of 20
+        let msg2 = InstantiateMsg { count: 20 };
+        let info2 = mock_info("creator", &coins(2, "earth"));
+
+        // we can just call .unwrap() to assert this was a success
+        let res2 = instantiate(deps2.as_mut(), mock_env(), info2, msg2).unwrap();
+        assert_eq!(0, res2.messages.len());
+
+        // it worked, let's query the state
+        let res1 = query(deps1.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+        let value1: CountResponse = from_binary(&res1).unwrap();
+        assert_eq!(10, value1.count);
+
+        // ensure address_2's count (score) is 20
+        let res2 = query(deps2.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+        let value2: CountResponse = from_binary(&res2).unwrap();
+        assert_eq!(20, value2.count);
+
+
+
+        // reset the count (score) at address 2 to be 15
+        let auth_info = mock_info("creator", &coins(2, "earth"));
+        let msg2 = ExecuteMsg::Reset { count: 15 };
+        let _res = execute(deps2.as_mut(), mock_env(), auth_info, msg2).unwrap();
+
+        // address 1 shoud stay at 10
+        let res1 = query(deps1.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+        let value1: CountResponse = from_binary(&res1).unwrap();
+        assert_eq!(10, value1.count);
+
+        // address 2 should now be 15
+        let res2 = query(deps2.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+        let value2: CountResponse = from_binary(&res2).unwrap();
+        assert_eq!(15, value2.count);
+
+
+
+        // increment the count (score) at address 1 so that it's 11
+        let info1 = mock_info("creator", &coins(2, "token"));
+        let msg1 = ExecuteMsg::Increment {};
+        let _res = execute(deps1.as_mut(), mock_env(), info1, msg1).unwrap();
+
+        // address 1 shoud now be 11
+        let res1 = query(deps1.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+        let value1: CountResponse = from_binary(&res1).unwrap();
+        assert_eq!(11, value1.count);
+
+        // address 2 should stay at 15
+        let res2 = query(deps2.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+        let value2: CountResponse = from_binary(&res2).unwrap();
+        assert_eq!(15, value2.count);
+    }
+
+    #[test]
+    fn ensure_address_owners_can_not_reset_others_addresses() {
+        let mut deps1 = mock_dependencies(&coins(1, "earth"));
+        let mut deps2 = mock_dependencies(&coins(2, "earth"));
+
+        // // Instantiating address_1 with a score of 10
+        let msg1 = InstantiateMsg { count: 10 };
+        let info1 = mock_info("Alice", &coins(1, "earth"));
+
+        // we can just call .unwrap() to assert this was a success
+        let res1 = instantiate(deps1.as_mut(), mock_env(), info1, msg1).unwrap();
+        assert_eq!(0, res1.messages.len());
+
+        // Instantiating address_2 with a score of 20
+        let msg2 = InstantiateMsg { count: 20 };
+        let info2 = mock_info("Bob", &coins(2, "earth"));
+
+        // we can just call .unwrap() to assert this was a success
+        let res2 = instantiate(deps2.as_mut(), mock_env(), info2, msg2).unwrap();
+        assert_eq!(0, res2.messages.len());
+
+        // it worked, let's query the state
+        let res1 = query(deps1.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+        let value1: CountResponse = from_binary(&res1).unwrap();
+        assert_eq!(10, value1.count);
+
+        // ensure address_2's count (score) is 20
+        let res2 = query(deps2.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+        let value2: CountResponse = from_binary(&res2).unwrap();
+        assert_eq!(20, value2.count);
+
+
+        // ensure Alice can't reset Bob's
+        let info = mock_info("Bob", &coins(2, "earth"));
+        let msg = ExecuteMsg::Reset { count: 100 };
+        let res = execute(deps1.as_mut(), mock_env(), info, msg);
+        match res {
+            Err(ContractError::Unauthorized {}) => {}
+            _ => panic!("Must return unauthorized error"),
+        }
+
+        // ensure Bob can't reset Alice's
+        let info = mock_info("Alice", &coins(1, "earth"));
+        let msg = ExecuteMsg::Reset { count: 100 };
+        let res = execute(deps2.as_mut(), mock_env(), info, msg);
+        match res {
+            Err(ContractError::Unauthorized {}) => {}
+            _ => panic!("Must return unauthorized error"),
+        }
+    }
+
 
     // ===========================
     // VERBOSE REQUIREMENT TESTS
@@ -575,32 +692,36 @@ mod tests {
     // - you should store the score for different addresses in the smart contract state (ex. {address_1: 10, address_2: 20})
     #[test]
     fn store_the_score_for_different_addresses_in_the_smart_contract_state() {
-        let mut deps = mock_dependencies(&[]);
+        let mut deps1 = mock_dependencies(&coins(1, "earth"));
+        let mut deps2 = mock_dependencies(&coins(2, "earth"));
 
-        let msg = InstantiateMsg { count: 0 };
-        let info = mock_info("creator", &coins(1000, "earth"));
-
-        // we can just call .unwrap() to assert this was a success
-        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-        assert_eq!(0, res.messages.len());
-
-        // it worked, let's query the state
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(0, value.count);
-
-        // Instantiating the second time
-        let msg = InstantiateMsg { count: 50 };
-        let info = mock_info("creator", &coins(1000, "earth"));
+        // // Instantiating address_1 with a score of 10
+        let msg1 = InstantiateMsg { count: 10 };
+        let info1 = mock_info("creator", &coins(1, "earth"));
 
         // we can just call .unwrap() to assert this was a success
-        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-        assert_eq!(0, res.messages.len());
+        let res1 = instantiate(deps1.as_mut(), mock_env(), info1, msg1).unwrap();
+        assert_eq!(0, res1.messages.len());
+
+        // Instantiating address_2 with a score of 20
+        let msg2 = InstantiateMsg { count: 20 };
+        let info2 = mock_info("creator", &coins(2, "earth"));
+
+        // we can just call .unwrap() to assert this was a success
+        let res2 = instantiate(deps2.as_mut(), mock_env(), info2, msg2).unwrap();
+        assert_eq!(0, res2.messages.len());
+
+
 
         // it worked, let's query the state
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(50, value.count);
+        let res1 = query(deps1.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+        let value1: CountResponse = from_binary(&res1).unwrap();
+        assert_eq!(10, value1.count);
+
+        // ensure address_2's count (score) is 20
+        let res2 = query(deps2.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+        let value2: CountResponse = from_binary(&res2).unwrap();
+        assert_eq!(20, value2.count);
     }
 
     // - you should support an execute message where only the owner of the smart contract can set the score of an address 
@@ -632,8 +753,23 @@ mod tests {
         assert_eq!(5, value.count);
     }
 
-    // - you should support a read query to get the score for a particular address
+    // - you should support a read query to get the score for a particular address (note count and score are the same)
+    #[test]
+    fn read_query_to_get_the_score_of_particular_address() {
+        let mut deps = mock_dependencies(&[]);
 
+        let msg = InstantiateMsg { count: 10 };
+        let info = mock_info("creator", &coins(1000, "earth"));
+
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // it worked, let's query the state
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+        let value: CountResponse = from_binary(&res).unwrap();
+        assert_eq!(10, value.count);
+    }
 
     // - break down an address's score by token type
 
