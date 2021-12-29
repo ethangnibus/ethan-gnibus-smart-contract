@@ -1,3 +1,8 @@
+# Ethan Gnibus Smart Contract
+This project is based on the CosmWasm Starter Pack. See below for details.
+
+
+
 # CosmWasm Starter Pack
 
 This is a template to build smart contracts in Rust to run inside a
