@@ -1,0 +1,1 @@
+257a2892a46f2c94e96299d65ca28fff6df0204cb79e7cee69d08030ca647021  ./target/wasm32-unknown-unknown/release/ethan_gnibus_smart_contract.wasm
