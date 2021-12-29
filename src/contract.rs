@@ -4,7 +4,7 @@ use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response,
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
-use crate::msg::{CountResponse, OwnerResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
+use crate::msg::{CountResponse, ExecuteMsg, InstantiateMsg, OwnerResponse, QueryMsg};
 use crate::state::{State, STATE};
 
 // version info for migration info
@@ -67,7 +67,7 @@ pub fn try_reset(deps: DepsMut, info: MessageInfo, count: i32) -> Result<Respons
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetCount {} => to_binary(&query_count(deps)?),
-        QueryMsg::GetOwner {} => to_binary(&query_owner(deps)?)
+        QueryMsg::GetOwner {} => to_binary(&query_owner(deps)?),
     }
 }
 
