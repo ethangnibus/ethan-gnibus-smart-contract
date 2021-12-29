@@ -367,8 +367,6 @@ mod tests {
         let value: CountResponse = from_binary(&res).unwrap();
         assert_eq!(5, value.count);
 
-
-
         // testing non creator trying to reset again
         let unauth_info = mock_info("anyone", &coins(2, "token"));
         let msg = ExecuteMsg::Reset { count: 10 };
@@ -441,7 +439,6 @@ mod tests {
         let value: CountResponse = from_binary(&res).unwrap();
         assert_eq!(9, value.count);
 
-
         // beneficiary can release it
         let unauth_info = mock_info("anyone", &coins(2, "token"));
         let msg = ExecuteMsg::Reset { count: 3 };
@@ -462,7 +459,6 @@ mod tests {
         assert_eq!(3, value.count);
     }
 
-
     #[test]
     fn increment_then_reset_twice() {
         let mut deps = mock_dependencies(&coins(2, "token"));
@@ -480,7 +476,6 @@ mod tests {
         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
         let value: CountResponse = from_binary(&res).unwrap();
         assert_eq!(18, value.count);
-
 
         // beneficiary can release it
         let unauth_info = mock_info("anyone", &coins(2, "token"));
@@ -562,8 +557,6 @@ mod tests {
         let value2: CountResponse = from_binary(&res2).unwrap();
         assert_eq!(20, value2.count);
 
-
-
         // reset the count (score) at address 2 to be 15
         let auth_info = mock_info("creator", &coins(2, "earth"));
         let msg2 = ExecuteMsg::Reset { count: 15 };
@@ -578,8 +571,6 @@ mod tests {
         let res2 = query(deps2.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
         let value2: CountResponse = from_binary(&res2).unwrap();
         assert_eq!(15, value2.count);
-
-
 
         // increment the count (score) at address 1 so that it's 11
         let info1 = mock_info("creator", &coins(2, "token"));
@@ -628,7 +619,6 @@ mod tests {
         let value2: CountResponse = from_binary(&res2).unwrap();
         assert_eq!(20, value2.count);
 
-
         // ensure Alice can't reset Bob's
         let info = mock_info("Bob", &coins(2, "earth"));
         let msg = ExecuteMsg::Reset { count: 100 };
@@ -647,7 +637,6 @@ mod tests {
             _ => panic!("Must return unauthorized error"),
         }
     }
-
 
     // ===========================
     // VERBOSE REQUIREMENT TESTS
@@ -711,8 +700,6 @@ mod tests {
         let res2 = instantiate(deps2.as_mut(), mock_env(), info2, msg2).unwrap();
         assert_eq!(0, res2.messages.len());
 
-
-
         // it worked, let's query the state
         let res1 = query(deps1.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
         let value1: CountResponse = from_binary(&res1).unwrap();
@@ -753,7 +740,7 @@ mod tests {
         assert_eq!(5, value.count);
     }
 
-    // - you should support a read query to get the score for a particular address (note count and score are the same)
+    // - you should support an execute message where only the owner of the smart contract can set the score of an address
     #[test]
     fn read_query_to_get_the_score_of_particular_address() {
         let mut deps = mock_dependencies(&[]);
@@ -770,7 +757,4 @@ mod tests {
         let value: CountResponse = from_binary(&res).unwrap();
         assert_eq!(10, value.count);
     }
-
-    // - break down an address's score by token type
-
 }
