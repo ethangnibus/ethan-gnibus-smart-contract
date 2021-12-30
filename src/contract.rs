@@ -23,6 +23,7 @@ pub fn instantiate(
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
+    //msg.hash;
     let state = State {
         count: msg.count,
         hash: msg.hash.clone(),
@@ -48,8 +49,26 @@ pub fn execute(
     match msg {
         ExecuteMsg::Increment {} => try_increment(deps),
         ExecuteMsg::Reset { count } => try_reset(deps, info, count),
+        ExecuteMsg::Set { address, new_score } => try_set(deps, info, address, new_score),
     }
 }
+
+pub fn try_set(deps: DepsMut, info: MessageInfo, address: String, new_score: i32) -> Result<Response, ContractError> {
+    STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
+        if info.sender != state.owner {
+            return Err(ContractError::Unauthorized {});
+        }
+
+        let mut deserialized: HashMap<String, i32> = serde_json::from_str(&state.hash).unwrap();
+        *deserialized.get_mut(&address).unwrap() = new_score;
+        let serialized = serde_json::to_string(&deserialized).unwrap();
+
+        state.hash = String::from(serialized);
+        Ok(state)
+    })?;
+    Ok(Response::new().add_attribute("method", "set"))
+}
+
 
 pub fn try_increment(deps: DepsMut) -> Result<Response, ContractError> {
     STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
@@ -103,12 +122,12 @@ mod tests {
     // ===========================
     // Unit TESTS
     // ===========================
-
+ 
     #[test]
-    fn proper_initialization_with_0() {
+    fn init_key_1_val_10() {
         let mut deps = mock_dependencies(&[]);
-        let mut hash: HashMap<&str, i32> = HashMap::new();
-        hash.insert("1", 10);
+        let mut hash: HashMap<String, i32> = HashMap::new();
+        hash.insert(String::from("1"), 10);
 
         let serialized = serde_json::to_string(&hash).unwrap();
 
@@ -125,11 +144,61 @@ mod tests {
         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetHash {}).unwrap();
         let value: HashResponse = from_binary(&res).unwrap();
         let hash = value.hash;
-        let deserialized: HashMap<&str, i32> = serde_json::from_str(&hash).unwrap();
-
-        let mut option = deserialized.get("1");
+        let deserialized: HashMap<String, i32> = serde_json::from_str(&hash).unwrap();
+        let mut option = deserialized.get(&String::from("1"));
         let score: &mut &i32 = option.get_or_insert(&(1 as i32));
         let expected: i32 = 10 as i32;
+        assert_eq!(**score, expected);
+    }
+
+    #[test]
+    // fn set_by_anyone() {
+    //     // FIXME:
+
+    //     // beneficiary can release it
+    //     let info = mock_info("anyone", &coins(2, "token"));
+    //     let msg = ExecuteMsg::Increment {};
+    //     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+    //     // should increase counter by 1
+    //     let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
+    //     let value: CountResponse = from_binary(&res).unwrap();
+    //     assert_eq!(18, value.count);
+
+    //     // let msg = ExecuteMsg::Reset { count: 5 };
+    // //     let res = execute(deps.as_mut(), mock_env(), unauth_info, msg);
+    // //     match res {
+    // //         Err(ContractError::Unauthorized {}) => {}
+    // //         _ => panic!("Must return unauthorized error"),
+    // //     }
+    // }
+
+    #[test]
+    fn set_by_creator() {
+        let mut deps = mock_dependencies(&[]);
+        let mut hash: HashMap<String, i32> = HashMap::new();
+        hash.insert(String::from("1"), 10);
+        let serialized = serde_json::to_string(&hash).unwrap();
+        let hash: String = String::from(serialized);
+        let msg = InstantiateMsg { count: 0, hash: hash};
+        let info = mock_info("creator", &coins(1000, "earth"));
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // beneficiary can release it
+        let info = mock_info("creator", &coins(1000, "earth"));
+        let msg = ExecuteMsg::Set { address: String::from("1"), new_score: 21 as i32};
+        let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+        // it worked, let's query the state
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetHash {}).unwrap();
+        let value: HashResponse = from_binary(&res).unwrap();
+        let hash = value.hash;
+        let deserialized: HashMap<String, i32> = serde_json::from_str(&hash).unwrap();
+        let mut option = deserialized.get(&String::from("1"));
+        let score: &mut &i32 = option.get_or_insert(&(1 as i32));
+        let expected: i32 = 21 as i32;
         assert_eq!(**score, expected);
     }
 
