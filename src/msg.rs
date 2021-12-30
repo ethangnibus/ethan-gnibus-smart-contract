@@ -1,10 +1,12 @@
 use cosmwasm_std::Addr;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+// use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
     pub count: i32,
+    pub hash: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -20,6 +22,7 @@ pub enum QueryMsg {
     // GetCount returns the current count as a json-encoded number
     GetCount {},
     GetOwner {},
+    GetHash {},
 }
 
 // We define a custom struct for each query response
@@ -32,4 +35,11 @@ pub struct CountResponse {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct OwnerResponse {
     pub owner: Addr,
+}
+
+// We define a custom struct for each query response
+// #[serde_as]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct HashResponse {
+    pub hash: String
 }
