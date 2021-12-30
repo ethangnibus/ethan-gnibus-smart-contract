@@ -1,3 +1,7 @@
+// ======================================================================
+// Imports
+// ======================================================================
+
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, OwnedDeps, Response, StdResult};
@@ -15,6 +19,10 @@ extern crate serde_json;
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:ethan-gnibus-smart-contract";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+// ======================================================================
+// Instantiate Block
+// ======================================================================
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -49,6 +57,10 @@ pub fn instantiate(
     )
 }
 
+// ======================================================================
+// Execute Block
+// ======================================================================
+
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
@@ -64,33 +76,14 @@ pub fn execute(
     }
 }
 
-// pub fn try_increment(deps: DepsMut) -> Result<Response, ContractError> {
-//     STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
-//         state.count += 1;
-//         Ok(state)
-//     })?;
-
-//     Ok(Response::new().add_attribute("method", "try_increment"))
-// }
-
-// pub fn try_reset(deps: DepsMut, info: MessageInfo, count: i32) -> Result<Response, ContractError> {
-//     STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
-//         if info.sender != state.owner {
-//             return Err(ContractError::Unauthorized {});
-//         }
-//         state.count = count;
-//         Ok(state)
-//     })?;
-//     Ok(Response::new().add_attribute("method", "reset"))
-// }
-
-pub fn try_add_address(deps: DepsMut, info: MessageInfo, new_address: String, new_score: i32) -> Result<Response, ContractError> {
+pub fn try_add_address(deps: DepsMut, _info: MessageInfo, new_address: String, new_score: i32) -> Result<Response, ContractError> {
     STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
         // Deserialize the state HashMap from the JSON String.
         let mut deserialized: HashMap<String, i32> = serde_json::from_str(&state.hash).unwrap();
-
+        
         // Error if now_address is already in the HashMap.
         if deserialized.contains_key(&new_address) {
+            
             return Err(ContractError::Unauthorized {});
         }
 
@@ -114,9 +107,15 @@ pub fn try_set(deps: DepsMut, info: MessageInfo, address: String, new_score: i32
             return Err(ContractError::Unauthorized {});
         }
 
-        // Deserialize the state HashMap from the JSON String
-        // and update the score at the given address.
+        // Deserialize the state HashMap from the JSON String.
         let mut deserialized: HashMap<String, i32> = serde_json::from_str(&state.hash).unwrap();
+
+        // Error if the address is not in the HashMap.
+        if !deserialized.contains_key(&address) {
+            return Err(ContractError::Unauthorized {});
+        }
+
+        // Update the score at the given address.
         *deserialized.get_mut(&address).unwrap() = new_score;
 
         // Update the JSON String with the updated Hashmap.
@@ -127,6 +126,10 @@ pub fn try_set(deps: DepsMut, info: MessageInfo, address: String, new_score: i32
     Ok(Response::new().add_attribute("method", "set"))
 }
 
+// ======================================================================
+// Query Block
+// ======================================================================
+
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
@@ -136,11 +139,6 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::GetScoreFromAddress { address } => to_binary(&query_score_from_address(deps, address)?),
     }
 }
-
-// fn query_count(deps: Deps) -> StdResult<CountResponse> {
-//     let state = STATE.load(deps.storage)?;
-//     Ok(CountResponse { count: state.count })
-// }
 
 fn query_owner(deps: Deps) -> StdResult<OwnerResponse> {
     let state = STATE.load(deps.storage)?;
@@ -160,8 +158,13 @@ fn query_score_from_address(deps: Deps,  address: String) -> StdResult<ScoreFrom
     Ok(ScoreFromAddressResponse { score: score })
 }
 
+// ======================================================================
+// Testing Block
+// ======================================================================
 #[cfg(test)]
 mod tests {
+
+    // Testing Imports
     use super::*;
     use cosmwasm_std::testing::{MockApi, mock_dependencies, mock_env, mock_info, MockQuerier, MockStorage};
     use cosmwasm_std::{coins, from_binary};
@@ -190,8 +193,6 @@ mod tests {
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
     }
-
-    // FIXME: make invalid address test
 
     // - you should support a read query to get the owner of the smart contract
     #[test]
@@ -237,7 +238,27 @@ mod tests {
         assert_eq!(value.score, 20 as i32);
     }
 
-    // FIXME: write test to error if someone tries to add an address at an existing address
+    // Ensure one cannot add an address if it already exists.
+    #[test]
+    fn error_if_adding_to_existing_address() {
+        let (mut deps, info, msg) = setup();
+
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // Call AddAddress
+        let info = mock_info("owner", &coins(1000, "earth"));
+        let new_address = "1".to_string();
+        let new_score = 20 as i32;
+        let msg = ExecuteMsg::AddAddress { new_address: new_address, new_score: new_score};
+        let res = execute(deps.as_mut(), mock_env(), info, msg);
+
+        match res {
+            Err(ContractError::Unauthorized {}) => {}
+            _ => panic!("Must return unauthorized error"),
+        }
+    }
 
     // - you should support an execute message where only the owner of the smart contract can set the score of an address
     #[test]
@@ -250,7 +271,7 @@ mod tests {
 
         // beneficiary can release it
         let info = mock_info("owner", &coins(1000, "earth"));
-        let msg = ExecuteMsg::Set { address: String::from("1"), new_score: 21 as i32};
+        let msg = ExecuteMsg::Set { address: "1".to_string(), new_score: 21 as i32};
         let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // it worked, let's query the state
@@ -270,7 +291,7 @@ mod tests {
 
         // beneficiary can release it
         let info = mock_info("anyone", &coins(2, "token"));
-        let msg = ExecuteMsg::Set { address: String::from("1"), new_score: 21 as i32};
+        let msg = ExecuteMsg::Set { address: "1".to_string(), new_score: 21 as i32};
         let res = execute(deps.as_mut(), mock_env(), info, msg);
         
         match res {
@@ -303,6 +324,25 @@ mod tests {
     // UNIT TESTS
     // ===========================
 
+    // Ensure one cannot set at an invalid address.
+    #[test]
+    fn set_by_owner_at_invalid_address() {
+        let (mut deps, info, msg) = setup();
+
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // beneficiary can release it
+        let info = mock_info("owner", &coins(1000, "earth"));
+        let msg = ExecuteMsg::Set { address: "2".to_string(), new_score: 21 as i32};
+        let res = execute(deps.as_mut(), mock_env(), info, msg);
+
+        match res {
+            Err(ContractError::Unauthorized {}) => {}
+            _ => panic!("Must provide a valid address to set."),
+        }
+    }
 
     // #[test]
     // fn proper_initialization_with_0() {
