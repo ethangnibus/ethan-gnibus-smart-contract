@@ -16,7 +16,7 @@ extern crate serde_derive;
 extern crate serde;
 extern crate serde_json;
 
-// version info for migration info
+// version info for migration info.
 const CONTRACT_NAME: &str = "crates.io:ethan-gnibus-smart-contract";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -24,6 +24,7 @@ const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 // Instantiate Block
 // ======================================================================
 
+/// Instantiate a smart contract.
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
@@ -34,7 +35,7 @@ pub fn instantiate(
     
     // Use msg.first_address_score to make a JSON string that will
     // hold the Key, Value pairs we will use to represent
-    // Addresses and corresponding scores
+    // addresses and corresponding scores.
     let address = msg.first_address;
     let score = msg.first_address_score;
     let mut hash: HashMap<String, i32> = HashMap::new();
@@ -63,6 +64,7 @@ pub fn instantiate(
 // Execute Block
 // ======================================================================
 
+/// Execute a command that will change a smart contract.
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn execute(
     deps: DepsMut,
@@ -79,6 +81,7 @@ pub fn execute(
     }
 }
 
+/// Adds the (address, score) pair to the smart contract iff the address if valid.
 pub fn try_add_address(deps: DepsMut, _info: MessageInfo, new_address: String, new_score: i32) -> Result<Response, ContractError> {
     STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
         // Deserialize the state HashMap from the JSON String.
@@ -104,6 +107,7 @@ pub fn try_add_address(deps: DepsMut, _info: MessageInfo, new_address: String, n
     Ok(Response::new().add_attribute("method", "add_address"))
 }
 
+/// Updates the score at the given address iff the address is valid.
 pub fn try_set(deps: DepsMut, info: MessageInfo, address: String, new_score: i32) -> Result<Response, ContractError> {
     STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
         // Error if someone other than the owner is trying to set.
@@ -135,6 +139,7 @@ pub fn try_set(deps: DepsMut, info: MessageInfo, address: String, new_score: i32
 // Query Block
 // ======================================================================
 
+/// Calls a query that will not change the smart contract's contents.
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
@@ -150,6 +155,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     }
 }
 
+/// Return the owner of the provided smart contract.
 fn query_owner(deps: Deps) -> StdResult<OwnerResponse> {
     // Load the state.
     let state = STATE.load(deps.storage)?;
@@ -158,6 +164,9 @@ fn query_owner(deps: Deps) -> StdResult<OwnerResponse> {
     Ok(OwnerResponse { owner: state.owner })
 }
 
+/// Return the HashMap of addresses and cooresponding
+/// scores converted to a JSON String that cooresponds
+/// to the provided smart contract.
 fn query_hash(deps: Deps) -> StdResult<HashResponse> {
     // Load the state.
     let state = STATE.load(deps.storage)?;
@@ -166,6 +175,7 @@ fn query_hash(deps: Deps) -> StdResult<HashResponse> {
     Ok(HashResponse { hash: state.hash })
 }
 
+/// Return the acore the corresponds to the given address and smart contract.
 fn query_score_from_address(deps: Deps,  address: String) -> StdResult<ScoreFromAddressResponse> {
     // Load the state.
     let state = STATE.load(deps.storage)?;
@@ -187,12 +197,13 @@ fn query_score_from_address(deps: Deps,  address: String) -> StdResult<ScoreFrom
 
 #[cfg(test)]
 mod tests {
-
     // Imports for testing purposes.
     use super::*;
     use cosmwasm_std::testing::{MockApi, mock_dependencies, mock_env, mock_info, MockQuerier, MockStorage};
     use cosmwasm_std::{coins, from_binary};
 
+    /// A "DO BEFORE EACH" testing utility function.
+    /// Returns the parameters necessary to instantiate a smart contract.
     pub fn setup() -> (OwnedDeps<MockStorage, MockApi, MockQuerier>, MessageInfo, InstantiateMsg) {
         // Mock out dependencies.
         let deps = mock_dependencies(&[]);
@@ -254,7 +265,7 @@ mod tests {
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        // Call AddAddress
+        // Call AddAddress.
         let info = mock_info("owner", &coins(1000, "earth"));
         let new_address = "2".to_string();
         let new_score = 20 as i32;
@@ -291,7 +302,7 @@ mod tests {
         let msg = ExecuteMsg::Set { address: "1".to_string(), new_score: 21 as i32};
         let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-        // Make sure Address1's score is 10.
+        // Make sure Address1's score is 21.
         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetScoreFromAddress {address : "1".to_string()}).unwrap();
         let value: ScoreFromAddressResponse = from_binary(&res).unwrap();
         assert_eq!(value.score, 21 as i32);
@@ -392,37 +403,6 @@ mod tests {
         }
     }
 
-    /// Testing storing scores for different addresses in the smart contract state.
-    /// (ex. {address_1: 10, address_2: 20})
-    #[test]
-    fn store_the_score_for_different_addresses_in_the_smart_contract_state() {
-        // Call the "Do Before Each" testing utility function.
-        let (mut deps, info, msg) = setup();
-
-        // Instantiate the contract.
-        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-        assert_eq!(0, res.messages.len());
-
-        // Call AddAddress
-        let info = mock_info("owner", &coins(1000, "earth"));
-        let new_address = "2".to_string();
-        let new_score = 20 as i32;
-        let msg = ExecuteMsg::AddAddress { new_address: new_address, new_score: new_score};
-        let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
-
-        // Ensure Address1's score is 10.
-        let address = "1".to_string();
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetScoreFromAddress {address : address}).unwrap();
-        let value: ScoreFromAddressResponse = from_binary(&res).unwrap();
-        assert_eq!(value.score, 10 as i32);
-
-        // Ensure Address2's score is 20.
-        let address = "2".to_string();
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetScoreFromAddress {address : address}).unwrap();
-        let value: ScoreFromAddressResponse = from_binary(&res).unwrap();
-        assert_eq!(value.score, 20 as i32);
-    }
-
     /// Testing storing scores for lots of addresses in the smart contract state.
     #[test]
     fn lots_of_addresses() {
@@ -433,23 +413,121 @@ mod tests {
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        // Call AddAddress
-        let info = mock_info("owner", &coins(1000, "earth"));
-        let new_address = "2".to_string();
-        let new_score = 20 as i32;
-        let msg = ExecuteMsg::AddAddress { new_address: new_address, new_score: new_score};
-        let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+        for n in 2..47 {
+            // Call AddAddress.
+            let info = mock_info("owner", &coins(1000, "earth"));
+            let new_address = n.to_string();
+            let new_score = n * 10 as i32;
+            let msg = ExecuteMsg::AddAddress { new_address: new_address, new_score: new_score};
+            let _res = execute(deps.as_mut(), mock_env(), info, msg);
+        }
 
-        // Ensure Address1's score is 10.
-        let address = "1".to_string();
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetScoreFromAddress {address : address}).unwrap();
-        let value: ScoreFromAddressResponse = from_binary(&res).unwrap();
-        assert_eq!(value.score, 10 as i32);
+        for n in 1..47 {
+            // Ensure Address{n}'s score is n * 10.
+            let address = n.to_string();
+            let res = query(deps.as_ref(), mock_env(), QueryMsg::GetScoreFromAddress {address : address}).unwrap();
+            let value: ScoreFromAddressResponse = from_binary(&res).unwrap();
+            assert_eq!(value.score, n * 10 as i32);
+        }
+    }
 
-        // Ensure Address2's score is 20.
-        let address = "2".to_string();
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetScoreFromAddress {address : address}).unwrap();
+    /// Testing storing scores for lots of addresses in the smart contract state.
+    #[test]
+    fn store_lots_of_addresses_then_set_them() {
+        // Call the "Do Before Each" testing utility function.
+        let (mut deps, info, msg) = setup();
+
+        // Instantiate the contract.
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        for n in 2..20 {
+            // Call AddAddress.
+            let info = mock_info("owner", &coins(1000, "earth"));
+            let new_address = n.to_string();
+            let new_score = n * 10 as i32;
+            let msg = ExecuteMsg::AddAddress { new_address: new_address, new_score: new_score};
+            let _res = execute(deps.as_mut(), mock_env(), info, msg);
+        }
+
+        for n in 1..20 {
+            // Ensure Address{n}'s score is n * 10.
+            let address = n.to_string();
+            let res = query(deps.as_ref(), mock_env(), QueryMsg::GetScoreFromAddress {address : address}).unwrap();
+            let value: ScoreFromAddressResponse = from_binary(&res).unwrap();
+            assert_eq!(value.score, n * 10 as i32);
+        }
+
+        for n in 1..20 {
+            // Execute Set as owner.
+            let info = mock_info("owner", &coins(1000, "earth"));
+            let msg = ExecuteMsg::Set { address: n.to_string(), new_score: 100 as i32};
+            let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+        }
+        
+        for n in 1..20 {
+            // Make sure Address1's score is 100.
+            let res = query(deps.as_ref(), mock_env(), QueryMsg::GetScoreFromAddress {address : n.to_string()}).unwrap();
+            let value: ScoreFromAddressResponse = from_binary(&res).unwrap();
+            assert_eq!(value.score, 100 as i32);
+        }
+    }
+
+    /// Testing owners of different smart contracts can't Set each other's scores.
+    #[test]
+    fn cross_set() {
+        // Mock out dependencies.
+        let mut deps1 = mock_dependencies(&[]);
+        let mut deps2 = mock_dependencies(&[]);
+
+        // Mock out account info.
+        let info1 = mock_info("Alice", &coins(1000, "earth"));
+        let info2 = mock_info("Bob", &coins(2, "token"));
+
+        // Create a message that could be used to instantiate a smart contract.
+        let msg1 = InstantiateMsg {
+            first_address: "1".to_string(),
+            first_address_score: 5 as i32
+        };
+        let msg2 = InstantiateMsg {
+            first_address: "1".to_string(),
+            first_address_score: 17 as i32
+        };
+    
+        // Instantiate both smart contracts.
+        let res1 = instantiate(deps1.as_mut(), mock_env(), info1, msg1).unwrap();
+        assert_eq!(0, res1.messages.len());
+        let res2 = instantiate(deps2.as_mut(), mock_env(), info2, msg2).unwrap();
+        assert_eq!(0, res2.messages.len());
+
+        // Reset the infos because they were moved.
+        let info1 = mock_info("Alice", &coins(1000, "earth"));
+        let info2 = mock_info("Bob", &coins(2, "token"));
+
+        // Try to execute Set on Alice's contract as Bob.
+        let msg = ExecuteMsg::Set { address: "1".to_string(), new_score: 0 as i32};
+        let res = execute(deps1.as_mut(), mock_env(), info2, msg);
+        match res {
+            Err(ContractError::Unauthorized {}) => {}
+            _ => panic!("Must return unauthorized error"),
+        }
+
+        // Ensure Alice's Address1 score is still 5.
+        let res = query(deps1.as_ref(), mock_env(), QueryMsg::GetScoreFromAddress {address : "1".to_string()}).unwrap();
         let value: ScoreFromAddressResponse = from_binary(&res).unwrap();
-        assert_eq!(value.score, 20 as i32);
+        assert_eq!(value.score, 5 as i32);
+
+        // Try to execute Set on Bob's contract as Alice.
+        let msg = ExecuteMsg::Set { address: "1".to_string(), new_score: 0 as i32};
+        let res = execute(deps2.as_mut(), mock_env(), info1, msg);
+        match res {
+            Err(ContractError::Unauthorized {}) => {}
+            _ => panic!("Must return unauthorized error"),
+        }
+
+        // Ensure Bob's Address1 score is still 17.
+        let res = query(deps2.as_ref(), mock_env(), QueryMsg::GetScoreFromAddress {address : "1".to_string()}).unwrap();
+        let value: ScoreFromAddressResponse = from_binary(&res).unwrap();
+        assert_eq!(value.score, 17 as i32);
     }
 }
