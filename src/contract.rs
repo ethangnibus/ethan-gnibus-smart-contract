@@ -62,7 +62,7 @@ pub fn try_set(deps: DepsMut, info: MessageInfo, address: String, new_score: i32
         let mut deserialized: HashMap<String, i32> = serde_json::from_str(&state.hash).unwrap();
         *deserialized.get_mut(&address).unwrap() = new_score;
         let serialized = serde_json::to_string(&deserialized).unwrap();
-
+        
         state.hash = String::from(serialized);
         Ok(state)
     })?;
@@ -152,28 +152,6 @@ mod tests {
     }
 
     #[test]
-    // fn set_by_anyone() {
-    //     // FIXME:
-
-    //     // beneficiary can release it
-    //     let info = mock_info("anyone", &coins(2, "token"));
-    //     let msg = ExecuteMsg::Increment {};
-    //     let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
-
-    //     // should increase counter by 1
-    //     let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-    //     let value: CountResponse = from_binary(&res).unwrap();
-    //     assert_eq!(18, value.count);
-
-    //     // let msg = ExecuteMsg::Reset { count: 5 };
-    // //     let res = execute(deps.as_mut(), mock_env(), unauth_info, msg);
-    // //     match res {
-    // //         Err(ContractError::Unauthorized {}) => {}
-    // //         _ => panic!("Must return unauthorized error"),
-    // //     }
-    // }
-
-    #[test]
     fn set_by_creator() {
         let mut deps = mock_dependencies(&[]);
         let mut hash: HashMap<String, i32> = HashMap::new();
@@ -201,6 +179,40 @@ mod tests {
         let expected: i32 = 21 as i32;
         assert_eq!(**score, expected);
     }
+
+    #[test]
+    fn set_by_anyone() {
+        let mut deps = mock_dependencies(&[]);
+        let mut hash: HashMap<String, i32> = HashMap::new();
+        hash.insert(String::from("1"), 10);
+        let serialized = serde_json::to_string(&hash).unwrap();
+        let hash: String = String::from(serialized);
+        let msg = InstantiateMsg { count: 0, hash: hash};
+        let info = mock_info("creator", &coins(1000, "earth"));
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // beneficiary can release it
+        let info = mock_info("anyone", &coins(2, "token"));
+        let msg = ExecuteMsg::Set { address: String::from("1"), new_score: 21 as i32};
+        let res = execute(deps.as_mut(), mock_env(), info, msg);
+        
+        match res {
+            Err(ContractError::Unauthorized {}) => {}
+            _ => panic!("Must return unauthorized error"),
+        }
+
+    //     // beneficiary can release it
+    //     let unauth_info = mock_info("anyone", &coins(2, "token"));
+    //     let msg = ExecuteMsg::Reset { count: 5 };
+    //     let res = execute(deps.as_mut(), mock_env(), unauth_info, msg);
+    //     match res {
+    //         Err(ContractError::Unauthorized {}) => {}
+    //         _ => panic!("Must return unauthorized error"),
+    //     }
+    }
+
 
     // #[test]
     // fn proper_initialization_with_0() {
