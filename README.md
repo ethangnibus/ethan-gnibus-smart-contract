@@ -2,14 +2,14 @@
 ## What is a Smart Contract?
 To keep it simple, [Smart contracts](https://en.wikipedia.org/wiki/Smart_contract) control the logic of operations that happen on [blockchains](https://en.wikipedia.org/wiki/Blockchain). Smart contracts track their internal history through states that are saved when actions are preformed. A smart contract that tracks N states could be visualized below:
 
-![image](https://user-images.githubusercontent.com/59241452/147776266-d2e5fb94-5cbe-4da8-a9e3-71c1167dc358.png | height=100)
+![image](https://user-images.githubusercontent.com/59241452/147776266-d2e5fb94-5cbe-4da8-a9e3-71c1167dc358.png)
 
 ## Why the Ethan Gnibus Smart Contract is special? 
 The Ethan Gnibus Smart Contract is built on [Terra](https://docs.terra.money/), the leading decentralized and open-source public blockchain protocol for [algorithmic stablecoins](https://en.wikipedia.org/wiki/Stablecoin).
 ### Each state in this particular contract will contain addresses with corresponding scores.
 We could represent this as the following, where 1 <= K <= N:
 
-![image](https://user-images.githubusercontent.com/59241452/147776364-7ffa0f01-0180-4277-bc3e-80e272941913.png  | height=100)
+![image](https://user-images.githubusercontent.com/59241452/147776364-7ffa0f01-0180-4277-bc3e-80e272941913.png)
 
 As we can see, the architecture of the state looks very similar to that of a Dictionary in Python.
 
