@@ -29,9 +29,9 @@ If there exists a state history like the following, it is useful to find out who
 
 ![image](https://user-images.githubusercontent.com/59241452/147776486-a7a96b3d-052d-4c63-b9ac-ac14ce63f030.png)
 
-To do this, this contract implements a query that returns the "owner" field of the current state.
+To do this, this contract implements a query that returns the owner field of the current state.
 
-![image](https://user-images.githubusercontent.com/59241452/147776531-f766e545-5e4d-4c7a-a7b1-cc34ac126990.png)
+![image](https://user-images.githubusercontent.com/59241452/147776848-c5843c56-3bec-45d4-af4b-350aeecd145d.png)
 
 #### Query 2: Getting a score using a corresponding address
 Over time the addresses in the state history will populate so extracting information from the corresponding scores could be useful. This contract uses the current state to extract corresponding scores.
@@ -52,11 +52,11 @@ The owner could update the score at Address_1 to be 99. After this the state his
 #### Execute 2: Anyone can update the state with a new address
 Any user could add a score at a new address. For example, if the state history is:
 
-![image](https://user-images.githubusercontent.com/59241452/147776642-983cd17b-9a44-4910-b4bc-15c2c9ae5504.png)
+![image](https://user-images.githubusercontent.com/59241452/147777001-18bb4f9f-e685-4512-be9a-26c943e96028.png)
 
 Any user could make Address_3 and store 10 in it:
 
-![image](https://user-images.githubusercontent.com/59241452/147776709-daf2dc90-7158-4c2b-8ff6-85dc35a237ea.png)
+![image](https://user-images.githubusercontent.com/59241452/147777029-001fea5b-4aad-46ee-a90c-6fbe5e1907f8.png)
 
 ## Footer
 
