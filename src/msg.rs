@@ -1,55 +1,65 @@
+// ======================================================================
+// Imports
+// ======================================================================
+
 use cosmwasm_std::Addr;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-// use std::collections::HashMap;
+
+// ======================================================================
+// Message Block
+// ======================================================================
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
+    /// The smart contract's initial address.
     pub first_address: String,
-    pub first_address_score: i32,
+
+    /// The score cooresponding to the smart contract's initial address.
+    pub first_address_score: i32 ,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecuteMsg {
-    // Increment {},
-    // Reset { count: i32 },
-    Set { address: String, new_score: i32},
-    AddAddress { new_address: String, new_score: i32},
+    /// Outline the blueprint for a ExecuteMsg::Set(...).
+    Set { address: String, new_score: i32 },
+
+    /// Outline the blueprint for a ExecuteMsg::AddAddress(...).
+    AddAddress { new_address: String, new_score: i32 },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
-    // GetCount returns the current count as a json-encoded number
-    // GetCount {},
+    /// Outline the blueprint for a QueryMsg::GetOwner().
     GetOwner {},
+
+    /// Outline the blueprint for a QueryMsg::GetHash().
     GetHash {},
+
+    /// Outline the blueprint for a QueryMsg::GetScoreFromAddress(...).
     GetScoreFromAddress { address: String },
 }
 
-// // We define a custom struct for each query response
-// #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-// pub struct CountResponse {
-//     pub count: i32,
-// }
+// ======================================================================
+// Response Block
+// ======================================================================
 
-// We define a custom struct for each query response
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct OwnerResponse {
-    pub owner: Addr,
+    /// The name of the smart contract's owner.
+    pub owner: String,
 }
 
-// We define a custom struct for each query response
-// #[serde_as]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct HashResponse {
+    /// A HashMap of addresses and cooresponding scores converted to a JSON String.
     pub hash: String,
 }
 
-// We define a custom struct for each query response
-// #[serde_as]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct ScoreFromAddressResponse {
+    /// The score from a corresponding address in the state HashMap.
     pub score: i32,
 }
