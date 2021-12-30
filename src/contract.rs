@@ -133,13 +133,53 @@ mod tests {
 
     // - you should be able to instantiate the contract and set the owner
     #[test]
-    fn init_key_1_val_10() {
+    fn initiate_contract_and_set_owner() {
         let mut deps = mock_dependencies(&[]);
         let mut hash: HashMap<String, i32> = HashMap::new();
         hash.insert(String::from("1"), 10);
+        let serialized = serde_json::to_string(&hash).unwrap();
+        let hash: String = String::from(serialized);
+        let msg = InstantiateMsg { count: 0, hash: hash};
+        let info = mock_info("creator", &coins(1000, "earth"));
+
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+    }
+
+    // FIXME: make invalid address test
+
+    // - you should support a read query to get the owner of the smart contract
+    #[test]
+    fn support_a_read_query_to_get_the_owner_of_the_start_contract() {
+        let mut deps = mock_dependencies(&[]);
+        let mut hash: HashMap<String, i32> = HashMap::new();
+        hash.insert(String::from("1"), 10);
+        let serialized = serde_json::to_string(&hash).unwrap();
+        let hash: String = String::from(serialized);
+
+        let msg = InstantiateMsg { count: 0, hash: hash};
+        let info = mock_info("owner", &coins(1000, "earth"));
+
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // it worked, let's query the state
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetOwner {}).unwrap();
+        let value: OwnerResponse = from_binary(&res).unwrap();
+        assert_eq!("owner", value.owner);
+    }
+
+    // - you should store the score for different addresses in the smart contract state (ex. {address_1: 10, address_2: 20}) 
+    #[test]
+    fn store_the_score_for_different_addresses_in_the_smart_contract_state() {
+        let mut deps = mock_dependencies(&[]);
+        let mut hash: HashMap<String, i32> = HashMap::new();
+        hash.insert(String::from("1"), 10);
+        hash.insert(String::from("2"), 20);
 
         let serialized = serde_json::to_string(&hash).unwrap();
-
         let hash: String = String::from(serialized);
 
         let msg = InstantiateMsg { count: 0, hash: hash};
@@ -149,19 +189,16 @@ mod tests {
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
 
-        // it worked, let's query the state
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetHash {}).unwrap();
-        let value: HashResponse = from_binary(&res).unwrap();
-        let hash = value.hash;
-        let deserialized: HashMap<String, i32> = serde_json::from_str(&hash).unwrap();
-        let mut option = deserialized.get(&String::from("1"));
-        let score: &mut &i32 = option.get_or_insert(&(1 as i32));
-        let expected: i32 = 10 as i32;
-        assert_eq!(**score, expected);
-    }
+        // Make sure Address1's score is 10.
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetScoreFromAddress {address : "1".to_string()}).unwrap();
+        let value: ScoreFromAddressResponse = from_binary(&res).unwrap();
+        assert_eq!(value.score, 10 as i32);
 
-    // - you should support a read query to get the owner of the smart contract 
-    // - you should store the score for different addresses in the smart contract state (ex. {address_1: 10, address_2: 20}) 
+        // Make sure Address2's score is 20.
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetScoreFromAddress {address : "2".to_string()}).unwrap();
+        let value: ScoreFromAddressResponse = from_binary(&res).unwrap();
+        assert_eq!(value.score, 20 as i32);
+    }
 
     // - you should support an execute message where only the owner of the smart contract can set the score of an address
     #[test]
@@ -183,14 +220,10 @@ mod tests {
         let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
         // it worked, let's query the state
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetHash {}).unwrap();
-        let value: HashResponse = from_binary(&res).unwrap();
-        let hash = value.hash;
-        let deserialized: HashMap<String, i32> = serde_json::from_str(&hash).unwrap();
-        let mut option = deserialized.get(&String::from("1"));
-        let score: &mut &i32 = option.get_or_insert(&(1 as i32));
-        let expected: i32 = 21 as i32;
-        assert_eq!(**score, expected);
+        // Make sure Address1's score is 10.
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetScoreFromAddress {address : "1".to_string()}).unwrap();
+        let value: ScoreFromAddressResponse = from_binary(&res).unwrap();
+        assert_eq!(value.score, 21 as i32);
     }
 
     #[test]
@@ -215,6 +248,32 @@ mod tests {
             Err(ContractError::Unauthorized {}) => {}
             _ => panic!("Must return unauthorized error"),
         }
+
+        // Make sure Address1's score is 10.
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetScoreFromAddress {address : "1".to_string()}).unwrap();
+        let value: ScoreFromAddressResponse = from_binary(&res).unwrap();
+        assert_eq!(value.score, 10 as i32);
+    }
+
+    // - you should support a read query to get the score for a particular address
+    #[test]
+    fn read_query_to_get_the_score_of_particular_address() {
+        let mut deps = mock_dependencies(&[]);
+        let mut hash: HashMap<String, i32> = HashMap::new();
+        hash.insert(String::from("1"), 10);
+        let serialized = serde_json::to_string(&hash).unwrap();
+        let hash: String = String::from(serialized);
+        let msg = InstantiateMsg { count: 0, hash: hash};
+        let info = mock_info("creator", &coins(1000, "earth"));
+
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // it worked, let's query the state
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetScoreFromAddress {address : "1".to_string()}).unwrap();
+        let value: ScoreFromAddressResponse = from_binary(&res).unwrap();
+        assert_eq!(value.score, 10 as i32);
     }
 
 
