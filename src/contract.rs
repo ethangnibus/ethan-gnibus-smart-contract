@@ -4,7 +4,7 @@ use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response,
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
-use crate::msg::{CountResponse, ExecuteMsg, HashResponse, InstantiateMsg, OwnerResponse, QueryMsg};
+use crate::msg::{CountResponse, ExecuteMsg, HashResponse, InstantiateMsg, OwnerResponse, QueryMsg, ScoreFromAddressResponse};
 use crate::state::{State, STATE};
 use std::collections::HashMap;
 
@@ -53,23 +53,6 @@ pub fn execute(
     }
 }
 
-pub fn try_set(deps: DepsMut, info: MessageInfo, address: String, new_score: i32) -> Result<Response, ContractError> {
-    STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
-        if info.sender != state.owner {
-            return Err(ContractError::Unauthorized {});
-        }
-
-        let mut deserialized: HashMap<String, i32> = serde_json::from_str(&state.hash).unwrap();
-        *deserialized.get_mut(&address).unwrap() = new_score;
-        let serialized = serde_json::to_string(&deserialized).unwrap();
-        
-        state.hash = String::from(serialized);
-        Ok(state)
-    })?;
-    Ok(Response::new().add_attribute("method", "set"))
-}
-
-
 pub fn try_increment(deps: DepsMut) -> Result<Response, ContractError> {
     STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
         state.count += 1;
@@ -89,12 +72,29 @@ pub fn try_reset(deps: DepsMut, info: MessageInfo, count: i32) -> Result<Respons
     Ok(Response::new().add_attribute("method", "reset"))
 }
 
+pub fn try_set(deps: DepsMut, info: MessageInfo, address: String, new_score: i32) -> Result<Response, ContractError> {
+    STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
+        if info.sender != state.owner {
+            return Err(ContractError::Unauthorized {});
+        }
+
+        let mut deserialized: HashMap<String, i32> = serde_json::from_str(&state.hash).unwrap();
+        *deserialized.get_mut(&address).unwrap() = new_score;
+        let serialized = serde_json::to_string(&deserialized).unwrap();
+        
+        state.hash = String::from(serialized);
+        Ok(state)
+    })?;
+    Ok(Response::new().add_attribute("method", "set"))
+}
+
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetCount {} => to_binary(&query_count(deps)?),
         QueryMsg::GetOwner {} => to_binary(&query_owner(deps)?),
         QueryMsg::GetHash {} => to_binary(&query_hash(deps)?),
+        QueryMsg::GetScoreFromAddress { address } => to_binary(&query_score_from_address(deps, address)?),
     }
 }
 
@@ -113,6 +113,14 @@ fn query_hash(deps: Deps) -> StdResult<HashResponse> {
     Ok(HashResponse { hash: state.hash })
 }
 
+fn query_score_from_address(deps: Deps,  address: String) -> StdResult<ScoreFromAddressResponse> {
+    let state = STATE.load(deps.storage)?;
+    let deserialized: HashMap<String, i32> = serde_json::from_str(&state.hash).unwrap();
+    let mut option = deserialized.get(&address);
+    let score: i32 = **option.get_or_insert(&(1 as i32));
+    Ok(ScoreFromAddressResponse { score: score })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -122,7 +130,8 @@ mod tests {
     // ===========================
     // Unit TESTS
     // ===========================
- 
+
+    // - you should be able to instantiate the contract and set the owner
     #[test]
     fn init_key_1_val_10() {
         let mut deps = mock_dependencies(&[]);
@@ -151,6 +160,10 @@ mod tests {
         assert_eq!(**score, expected);
     }
 
+    // - you should support a read query to get the owner of the smart contract 
+    // - you should store the score for different addresses in the smart contract state (ex. {address_1: 10, address_2: 20}) 
+
+    // - you should support an execute message where only the owner of the smart contract can set the score of an address
     #[test]
     fn set_by_creator() {
         let mut deps = mock_dependencies(&[]);
@@ -202,15 +215,6 @@ mod tests {
             Err(ContractError::Unauthorized {}) => {}
             _ => panic!("Must return unauthorized error"),
         }
-
-    //     // beneficiary can release it
-    //     let unauth_info = mock_info("anyone", &coins(2, "token"));
-    //     let msg = ExecuteMsg::Reset { count: 5 };
-    //     let res = execute(deps.as_mut(), mock_env(), unauth_info, msg);
-    //     match res {
-    //         Err(ContractError::Unauthorized {}) => {}
-    //         _ => panic!("Must return unauthorized error"),
-    //     }
     }
 
 

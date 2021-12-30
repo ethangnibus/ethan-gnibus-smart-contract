@@ -24,6 +24,7 @@ pub enum QueryMsg {
     GetCount {},
     GetOwner {},
     GetHash {},
+    GetScoreFromAddress { address: String },
 }
 
 // We define a custom struct for each query response
@@ -42,5 +43,12 @@ pub struct OwnerResponse {
 // #[serde_as]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct HashResponse {
-    pub hash: String
+    pub hash: String,
+}
+
+// We define a custom struct for each query response
+// #[serde_as]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct ScoreFromAddressResponse {
+    pub score: i32,
 }
