@@ -58,6 +58,15 @@ Any user could make Address_3 and store 10 in it:
 
 ![image](https://user-images.githubusercontent.com/59241452/147777029-001fea5b-4aad-46ee-a90c-6fbe5e1907f8.png)
 
+## How to understand the code
+Navigate to the src folder and read the contract, msg, and state Rust Files to understand the Ethan Gnibus Smart Contract.
+- contract:
+	- Provides the logic that implements initialize, execute, and query commands. Scroll to the bottom to see the Testing Block.
+- msg: 
+	- Blueprints for the messages that will be passed into initialize, execute, and query commands.
+- state: 
+	- Defines the State struct that is used to represent the contract's current internal state.
+
 ## Footer
 
 This project is based on the [CosmWasm Starter Pack](https://github.com/InterWasm/cw-template).
