@@ -1,10 +1,10 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, OwnedDeps, Response, StdResult};
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
-use crate::msg::{CountResponse, ExecuteMsg, HashResponse, InstantiateMsg, OwnerResponse, QueryMsg, ScoreFromAddressResponse};
+use crate::msg::{ExecuteMsg, HashResponse, InstantiateMsg, OwnerResponse, QueryMsg, ScoreFromAddressResponse};
 use crate::state::{State, STATE};
 use std::collections::HashMap;
 
@@ -23,20 +23,30 @@ pub fn instantiate(
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
-    //msg.hash;
+    
+    // Use msg.first_address_score to make a JSON string that will
+    // hold the Key, Value pairs we will use to represent
+    // Addresses and corresponding scores
+    let address = msg.first_address;
+    let score = msg.first_address_score;
+    let mut hash: HashMap<String, i32> = HashMap::new();
+    hash.insert(address, score);
+    let hash = serde_json::to_string(&hash).unwrap().to_string();
+
+    // Initialize state.
     let state = State {
-        count: msg.count,
-        hash: msg.hash.clone(),
+        hash: hash.clone(),
         owner: info.sender.clone(),
     };
+
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     STATE.save(deps.storage, &state)?;
 
     Ok(Response::new()
         .add_attribute("method", "instantiate")
-        .add_attribute("hash", msg.hash)
+        .add_attribute("hash", hash)
         .add_attribute("owner", info.sender)
-        .add_attribute("count", msg.count.to_string()))
+    )
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -47,61 +57,90 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Increment {} => try_increment(deps),
-        ExecuteMsg::Reset { count } => try_reset(deps, info, count),
+        // ExecuteMsg::Increment {} => try_increment(deps),
+        // ExecuteMsg::Reset { count } => try_reset(deps, info, count),
+        ExecuteMsg::AddAddress { new_address, new_score } => try_add_address(deps, info, new_address, new_score),
         ExecuteMsg::Set { address, new_score } => try_set(deps, info, address, new_score),
     }
 }
 
-pub fn try_increment(deps: DepsMut) -> Result<Response, ContractError> {
-    STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
-        state.count += 1;
-        Ok(state)
-    })?;
+// pub fn try_increment(deps: DepsMut) -> Result<Response, ContractError> {
+//     STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
+//         state.count += 1;
+//         Ok(state)
+//     })?;
 
-    Ok(Response::new().add_attribute("method", "try_increment"))
-}
-pub fn try_reset(deps: DepsMut, info: MessageInfo, count: i32) -> Result<Response, ContractError> {
+//     Ok(Response::new().add_attribute("method", "try_increment"))
+// }
+
+// pub fn try_reset(deps: DepsMut, info: MessageInfo, count: i32) -> Result<Response, ContractError> {
+//     STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
+//         if info.sender != state.owner {
+//             return Err(ContractError::Unauthorized {});
+//         }
+//         state.count = count;
+//         Ok(state)
+//     })?;
+//     Ok(Response::new().add_attribute("method", "reset"))
+// }
+
+pub fn try_add_address(deps: DepsMut, info: MessageInfo, new_address: String, new_score: i32) -> Result<Response, ContractError> {
     STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
-        if info.sender != state.owner {
+        // Deserialize the state HashMap from the JSON String.
+        let mut deserialized: HashMap<String, i32> = serde_json::from_str(&state.hash).unwrap();
+
+        // Error if now_address is already in the HashMap.
+        if deserialized.contains_key(&new_address) {
             return Err(ContractError::Unauthorized {});
         }
-        state.count = count;
+
+        // insert the key value pair to the HashMap.
+        deserialized.insert(
+            new_address,
+            new_score,
+        );
+
+        // Update the JSON String with the updated Hashmap.
+        state.hash = serde_json::to_string(&deserialized).unwrap().to_string();
         Ok(state)
     })?;
-    Ok(Response::new().add_attribute("method", "reset"))
+    Ok(Response::new().add_attribute("method", "add_address"))
 }
 
 pub fn try_set(deps: DepsMut, info: MessageInfo, address: String, new_score: i32) -> Result<Response, ContractError> {
     STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
+        // Error if someone other than the owner is trying to set.
         if info.sender != state.owner {
             return Err(ContractError::Unauthorized {});
         }
 
+        // Deserialize the state HashMap from the JSON String
+        // and update the score at the given address.
         let mut deserialized: HashMap<String, i32> = serde_json::from_str(&state.hash).unwrap();
         *deserialized.get_mut(&address).unwrap() = new_score;
-        let serialized = serde_json::to_string(&deserialized).unwrap();
-        
-        state.hash = String::from(serialized);
+
+        // Update the JSON String with the updated Hashmap.
+        state.hash = serde_json::to_string(&deserialized).unwrap().to_string();
         Ok(state)
     })?;
+
     Ok(Response::new().add_attribute("method", "set"))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetCount {} => to_binary(&query_count(deps)?),
+        // QueryMsg::GetCount {} => to_binary(&query_count(deps)?),
         QueryMsg::GetOwner {} => to_binary(&query_owner(deps)?),
         QueryMsg::GetHash {} => to_binary(&query_hash(deps)?),
         QueryMsg::GetScoreFromAddress { address } => to_binary(&query_score_from_address(deps, address)?),
     }
 }
 
-fn query_count(deps: Deps) -> StdResult<CountResponse> {
-    let state = STATE.load(deps.storage)?;
-    Ok(CountResponse { count: state.count })
-}
+// fn query_count(deps: Deps) -> StdResult<CountResponse> {
+//     let state = STATE.load(deps.storage)?;
+//     Ok(CountResponse { count: state.count })
+// }
 
 fn query_owner(deps: Deps) -> StdResult<OwnerResponse> {
     let state = STATE.load(deps.storage)?;
@@ -124,23 +163,28 @@ fn query_score_from_address(deps: Deps,  address: String) -> StdResult<ScoreFrom
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use cosmwasm_std::testing::{MockApi, mock_dependencies, mock_env, mock_info, MockQuerier, MockStorage};
     use cosmwasm_std::{coins, from_binary};
 
+    pub fn setup() -> (OwnedDeps<MockStorage, MockApi, MockQuerier>, MessageInfo, InstantiateMsg) {
+        // setup code specific to your library's tests would go here
+        let deps = mock_dependencies(&[]);
+        let info = mock_info("owner", &coins(1000, "earth"));
+        let msg = InstantiateMsg {
+            first_address: "1".to_string(),
+            first_address_score: 10 as i32
+        };
+        return (deps, info, msg);
+    }
+
     // ===========================
-    // Unit TESTS
+    // VERBOSE REQUIREMENT TESTS
     // ===========================
 
     // - you should be able to instantiate the contract and set the owner
     #[test]
-    fn initiate_contract_and_set_owner() {
-        let mut deps = mock_dependencies(&[]);
-        let mut hash: HashMap<String, i32> = HashMap::new();
-        hash.insert(String::from("1"), 10);
-        let serialized = serde_json::to_string(&hash).unwrap();
-        let hash: String = String::from(serialized);
-        let msg = InstantiateMsg { count: 0, hash: hash};
-        let info = mock_info("creator", &coins(1000, "earth"));
+    fn instantiate_contract_and_set_owner() {
+        let (mut deps, info, msg) = setup();
 
         // we can just call .unwrap() to assert this was a success
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -152,14 +196,7 @@ mod tests {
     // - you should support a read query to get the owner of the smart contract
     #[test]
     fn support_a_read_query_to_get_the_owner_of_the_start_contract() {
-        let mut deps = mock_dependencies(&[]);
-        let mut hash: HashMap<String, i32> = HashMap::new();
-        hash.insert(String::from("1"), 10);
-        let serialized = serde_json::to_string(&hash).unwrap();
-        let hash: String = String::from(serialized);
-
-        let msg = InstantiateMsg { count: 0, hash: hash};
-        let info = mock_info("owner", &coins(1000, "earth"));
+        let (mut deps, info, msg) = setup();
 
         // we can just call .unwrap() to assert this was a success
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -174,48 +211,45 @@ mod tests {
     // - you should store the score for different addresses in the smart contract state (ex. {address_1: 10, address_2: 20}) 
     #[test]
     fn store_the_score_for_different_addresses_in_the_smart_contract_state() {
-        let mut deps = mock_dependencies(&[]);
-        let mut hash: HashMap<String, i32> = HashMap::new();
-        hash.insert(String::from("1"), 10);
-        hash.insert(String::from("2"), 20);
-
-        let serialized = serde_json::to_string(&hash).unwrap();
-        let hash: String = String::from(serialized);
-
-        let msg = InstantiateMsg { count: 0, hash: hash};
-        let info = mock_info("creator", &coins(1000, "earth"));
+        let (mut deps, info, msg) = setup();
 
         // we can just call .unwrap() to assert this was a success
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
 
+        // Call AddAddress
+        let info = mock_info("owner", &coins(1000, "earth"));
+        let new_address = "2".to_string();
+        let new_score = 20 as i32;
+        let msg = ExecuteMsg::AddAddress { new_address: new_address, new_score: new_score};
+        let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+
         // Make sure Address1's score is 10.
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetScoreFromAddress {address : "1".to_string()}).unwrap();
+        let address = "1".to_string();
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetScoreFromAddress {address : address}).unwrap();
         let value: ScoreFromAddressResponse = from_binary(&res).unwrap();
         assert_eq!(value.score, 10 as i32);
 
         // Make sure Address2's score is 20.
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetScoreFromAddress {address : "2".to_string()}).unwrap();
+        let address = "2".to_string();
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetScoreFromAddress {address : address}).unwrap();
         let value: ScoreFromAddressResponse = from_binary(&res).unwrap();
         assert_eq!(value.score, 20 as i32);
     }
 
+    // FIXME: write test to error if someone tries to add an address at an existing address
+
     // - you should support an execute message where only the owner of the smart contract can set the score of an address
     #[test]
-    fn set_by_creator() {
-        let mut deps = mock_dependencies(&[]);
-        let mut hash: HashMap<String, i32> = HashMap::new();
-        hash.insert(String::from("1"), 10);
-        let serialized = serde_json::to_string(&hash).unwrap();
-        let hash: String = String::from(serialized);
-        let msg = InstantiateMsg { count: 0, hash: hash};
-        let info = mock_info("creator", &coins(1000, "earth"));
+    fn set_by_owner() {
+        let (mut deps, info, msg) = setup();
+
         // we can just call .unwrap() to assert this was a success
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
 
         // beneficiary can release it
-        let info = mock_info("creator", &coins(1000, "earth"));
+        let info = mock_info("owner", &coins(1000, "earth"));
         let msg = ExecuteMsg::Set { address: String::from("1"), new_score: 21 as i32};
         let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
@@ -228,13 +262,8 @@ mod tests {
 
     #[test]
     fn set_by_anyone() {
-        let mut deps = mock_dependencies(&[]);
-        let mut hash: HashMap<String, i32> = HashMap::new();
-        hash.insert(String::from("1"), 10);
-        let serialized = serde_json::to_string(&hash).unwrap();
-        let hash: String = String::from(serialized);
-        let msg = InstantiateMsg { count: 0, hash: hash};
-        let info = mock_info("creator", &coins(1000, "earth"));
+        let (mut deps, info, msg) = setup();
+
         // we can just call .unwrap() to assert this was a success
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
         assert_eq!(0, res.messages.len());
@@ -258,13 +287,7 @@ mod tests {
     // - you should support a read query to get the score for a particular address
     #[test]
     fn read_query_to_get_the_score_of_particular_address() {
-        let mut deps = mock_dependencies(&[]);
-        let mut hash: HashMap<String, i32> = HashMap::new();
-        hash.insert(String::from("1"), 10);
-        let serialized = serde_json::to_string(&hash).unwrap();
-        let hash: String = String::from(serialized);
-        let msg = InstantiateMsg { count: 0, hash: hash};
-        let info = mock_info("creator", &coins(1000, "earth"));
+        let (mut deps, info, msg) = setup();
 
         // we can just call .unwrap() to assert this was a success
         let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
@@ -275,6 +298,10 @@ mod tests {
         let value: ScoreFromAddressResponse = from_binary(&res).unwrap();
         assert_eq!(value.score, 10 as i32);
     }
+
+    // ===========================
+    // UNIT TESTS
+    // ===========================
 
 
     // #[test]
